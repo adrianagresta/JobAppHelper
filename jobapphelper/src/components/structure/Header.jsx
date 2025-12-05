@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 function Header({ children }) {
   return (
     <div className="app-header">
-      {children || <h1>JobAppHelper</h1>}
+      {children || <div className="app-title">Applicant's Assistant</div>}
     </div>
   );
 }

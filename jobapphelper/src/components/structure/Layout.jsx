@@ -15,7 +15,7 @@ import './Layout.css';
  * - className: optional additional className for root
  */
 
-function Layout({ title, header, menu, children, footer, sidebar, className }) {
+function Layout({ title, header, menu, children, footer, className }) {
     useEffect(() => {
         if (title) {
             const prev = document.title;
@@ -38,10 +38,6 @@ function Layout({ title, header, menu, children, footer, sidebar, className }) {
             </nav>
 
             <main className="layout-main" role="main">
-                <aside className="layout-sidebar" aria-label="Application sidebar">
-                    {sidebar}
-                </aside>
-
                 <section className="layout-content" aria-label="Application content">
                     {children}
                 </section>
