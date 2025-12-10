@@ -33,6 +33,7 @@ The app displays active applications on the home page and supports details pages
   - `lastUpdate`: string (UTC ISO) — timestamp of last successful sync.
   - `dirty`: boolean — true if local changes exist to push.
   - `lastSyncAttempt`: string (UTC ISO, optional) — timestamp of last attempted sync.
+  - `reason`: string — last error reason from failed sync; cleared on success.
 
 - **Server Status table**
   - `seqno`: number — single authoritative global sequence number.
@@ -45,12 +46,6 @@ The app displays active applications on the home page and supports details pages
   - `label`: string — human-readable name.
   - `isActive`: boolean — available for selection.
   - `order`: number — UI sort order.
-  - Notes:
-    - `applied`: default state.
-    - `interview`: at least one interview scheduled.
-    - `post-interview`: all interviews concluded; awaiting decision.
-    - `rejected`: company explicitly rejected.
-    - Future statuses can be added without schema changes.
 
 ### Application entity
 
@@ -79,11 +74,6 @@ The app displays active applications on the home page and supports details pages
   - Client: hard delete; cascade to interviews.
   - Server: soft delete; cascade to interviews.
 
-- **Status transitions**
-  - `applied -> rejected`: set rejectionDate = current UTC ISO date.
-  - `rejected -> any other`: clear rejectionDate.
-  - `applied -> interview/post-interview`: no side effects.
-
 ### Interview entity
 
 - **Fields**
@@ -99,10 +89,6 @@ The app displays active applications on the home page and supports details pages
   - `interviewerPhone`: string (optional).
   - `interviewNotes`: string (optional).
 
-- **Delete behavior**
-  - Client: cascades hard delete when parent Application is deleted.
-  - Server: cascades soft delete when parent Application is deleted.
-
 ---
 
 ## IndexedDB schema
@@ -114,129 +100,161 @@ The app displays active applications on the home page and supports details pages
 
 - **status**
   - key: `"status"` (singleton)
-  - fields: seqno, lastUpdate, dirty, lastSyncAttempt
+  - fields: seqno, lastUpdate, dirty, lastSyncAttempt, reason
 
 - **statusCodes**
   - key: `code` (string)
   - fields: code, label, isActive, order
-  - indices:
-    - `byOrder` -> order
+  - indices: `byOrder`
 
 - **applications**
   - key: `id` (long int; negative provisional allowed)
-  - fields: as defined above
-  - indices:
-    - `byCompanyName` -> companyName
-    - `byCompanyUrl` -> companyUrl
-    - `byStatus` -> status
-    - `byApplicationDate` -> applicationDate
+  - indices: `byCompanyName`, `byCompanyUrl`, `byStatus`, `byApplicationDate`
 
 - **interviews**
   - key: `id` (long int; negative provisional allowed)
-  - fields: as defined above
-  - indices:
-    - `byApplicationId` -> applicationId
-    - `byInterviewDate` -> interviewDate
+  - indices: `byApplicationId`, `byInterviewDate`
+
+- **syncQueue**
+  - key: auto-increment
+  - fields:
+    - `operationType`: string (CREATE, UPDATE, DELETE)
+    - `entityType`: string (application/interview)
+    - `entityId`: number (negative provisional or positive server-assigned)
+    - `timestamp`: string (UTC ISO)
+    - `lastAttempt`: string (UTC ISO)
 
 ---
 
 ## UI and navigation
 
 - **Header:** Fixed; displays “Applicant’s Assistant”.
-- **Footer:** Fixed.
-- **Content area:** Scrollable.
+- **Menu bar:** Context-dependent buttons.
+- **Content area:** Scrollable, resizable.
+- **Footer:**  
+  - Center: “© [current year] Applicant’s Assistant”  
+  - Right: status indicator  
+    - Green `+` when online (last network op succeeded)  
+    - Red `-` when offline (last op and retries failed)  
+    - Blue `>>>` when sync in progress  
+
+### Pages
 
 - **Home page**
-  - Shows all non-rejected applications.
-  - Sort: applicationDate descending.
-  - Abbreviated fields: companyName, roleTitle, applicationDate, status.
-  - Clicking an application opens details.
+  - Menu bar: “New Application”, “Sync”, “Import”, “Export”
+  - Abbreviated list: companyName, roleTitle, applicationDate, status
+  - Left-column button opens Application details
 
 - **Application details page**
-  - Full application fields, editable.
-  - Interviews table: read-only; columns date, time, interviewer name, position.
-  - Clicking an interview opens Interview details page.
+  - Menu bar: “Save”, “Cancel”, “Add Interview”, “Delete” (if not provisional)
+  - Shows all application fields + interview table (date, time, interviewer name)
+  - Save: returns to Home immediately; sync runs in background
+  - Cancel: confirmation dialog; abandon edits, no drafts retained
+  - Add Interview: navigates to Interview details
+  - Delete: queues delete, hard deletes locally, syncs with server
 
 - **Interview details page**
-  - Full interview fields, editable.
-
-- **Menu: Data**
-  - Import: Overwrite local DB from JSON file (minimal validation).
-  - Export: Export all local data to JSON (includes base64 PDFs and plaintext credentials).
-  - Sync: Trigger sync with backend.
+  - Menu bar: “Done”, “Cancel”, “Delete” (if not provisional)
+  - Buttons interact only with IndexedDB; sync occurs when parent Application is saved
 
 ---
 
 ## Validation
 
-- **Timing:** on blur — runs when leaving a field.
-- **Mechanism:** each field supports a validation function; current placeholder always passes unless noted.
-
-- **Active validation rules**
-  - Status valid: must exist in statusCodes.
-  - Email format: local-part string before “@”; domain contains at least one period; no consecutive periods in the domain part after “@”.
-  - IDs: must be numeric (negative provisional or positive server-assigned).
-  - Dates/times: must be UTC ISO strings.
-  - Interview FK: no explicit referential integrity check beyond workflow and type; assumes valid link.
+- **Timing:** on blur
+- **Rules:**
+  - Status must exist in statusCodes
+  - Email format: local-part before “@”; domain contains at least one period; no consecutive periods
+  - IDs must be numeric
+  - Dates/times must be UTC ISO
 
 ---
 
 ## Import and export
 
-- **Export**
-  - Single JSON file containing: status, statusCodes, applications, interviews.
-  - PDFs embedded as base64 strings.
-  - Credentials included by default.
-  - No schema version field (explicitly deferred).
-
-- **Import**
-  - Reads JSON and applies minimal validations:
-    - Required fields present per entity.
-    - Status values exist in statusCodes.
-    - IDs are numeric, and interviews’ applicationId reference an application present in the payload.
-    - Base64 for PDFs decodes.
-  - If minimal validations pass: overwrite local DB.
-  - If any fail: reject import and show error.
+- **Export:** JSON with status, statusCodes, applications, interviews; PDFs base64; credentials included.
+- **Import:**  
+  - If validation passes: backup local DB, apply import.  
+  - If import fails: restore backup, discard backup after restore.  
+  - Minimal validations: required fields, valid status codes, numeric IDs, valid references, base64 PDFs.
 
 ---
 
 ## Sync design
 
-### Status semantics
+- **Client Status:** seqno, lastUpdate, dirty, lastSyncAttempt, reason
+- **Server Status:** seqno, lastWrite
+- **Provisional IDs:** replaced with server-assigned IDs on success
+- **Deletes:** client hard deletes; server soft deletes; tombstones sent in deltas
+- **Phases:**
+  - Phase 1: check if sync needed
+  - Phase 2: push/pull changes
+  - Phase 3: finalize, update Status, clear queue entries
+- **Anomaly:** client seqno > server seqno -> full client refresh
+- **Ordering/idempotency:** server guarantees ordered, idempotent deltas
 
-- **Client Status**
-  - `seqno` — last synchronized global sequence from server.
-  - `lastUpdate` — UTC ISO of last successful sync.
-  - `dirty` — indicates local changes to push.
-  - `lastSyncAttempt` — UTC ISO of last sync attempt.
+---
 
-- **Server Status**
-  - `seqno` — single authoritative global sequence.
-  - `lastWrite` — UTC ISO of last committed write.
+## Retry policy
 
-### Provisional ID reassignment
+- Attempt 1: T+0  
+- Attempt 2: T+15s  
+- Attempt 3: T+30s  
+- Attempt 4: T+2m  
+- Attempt 5: T+5m  
+- After 5 failures: offline until manual sync
 
-- Client creates Application/Interview with negative `id`.
-- On push, server assigns positive long `id` and returns mappings `{ provisionalId -> realId }` and authoritative fields.
-- Client updates all references (e.g., interviews.applicationId) atomically.
+---
 
-### Deletes
+## Security and privacy
 
-- Client: hard delete; cascades interviews.
-- Server: soft delete; cascades interviews.
-- Delete deltas: server emits tombstones; client hard-deletes on receipt.
+- Credentials stored plaintext in IndexedDB; included in exports.
+- Authentication required in multi-user backend; client purges DB on user change.
 
-### Sync phases
+---
 
-- **Phase 1: Is sync necessary?**
-  - If `Status.dirty` is true: sync required.
-  - Else, client sends `Status.seqno` to server:
-    - Equal: no server-side changes.
-    - Client < Server: pull updates.
-    - Client > Server: anomaly; perform full client refresh (purge local DB, download all data).
+## Error handling
 
-- **Phase 2: Call the sync**
-  - Pull added: client sends `lastUpdate` (UTC ISO); server returns records with `addedDate` > `lastUpdate`.
-  - Pull deleted: server returns IDs deleted on or after `lastUpdate`.
-  - Pull updated: server returns records with `lastUpdatedDate` > `lastUpdate`.
-  - Push local changes: client sends inserts/updates/deletes (including provisional IDs). Server applies changes, assigns IDs, returns authoritative records and
+- Status.reason stores last error; cleared on success.
+- SyncQueue entries retried until success; remain until manual sync if retries exhausted.
+
+---
+
+## Backlog
+
+- Schema versioning
+- Encryption at rest
+- Conflict resolution UI
+- Calendar/reminders
+- Client event log
+- Show sync details (likely a “?” icon next to footer indicator)
+- Import/export of SyncQueue (considered for offline portability)
+
+---
+
+## Outstanding Tasks
+
+- **Conflict resolution:** Not yet defined. Must decide how to handle concurrent edits in multi-user scenarios.  
+- **Partial sync success:** Not yet defined. Must decide whether to retry failed half immediately or defer to next sync cycle.
+
+---
+
+## Appendix: Example record
+
+```json
+{
+  "application": {
+    "id": -1001,
+    "companyName": "Acme Corp",
+    "roleTitle": "Senior Developer",
+    "applicationDate": "2025-12-10T00:00:00Z",
+    "status": "applied"
+  },
+  "interview": {
+    "id": -2001,
+    "applicationId": -1001,
+    "interviewerName": "Jane Smith",
+    "interviewDate": "2025-12-15T00:00:00Z",
+    "interviewTime": "2025-12-15T15:00:00Z"
+  }
+}
