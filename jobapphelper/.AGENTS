@@ -1,0 +1,10 @@
+This file contains instructions for AI agents. 
+
+Reread this file with every prompt even if you have read it before.
+Always follow best practices.
+Always follow good object oriented design principles.
+When writing code, if there is a choice between readability and shorter code, choose readability.
+
+After you have read this file but before you start working on the user's request, always respond with ".AGENTS file has been read". Always 
+reread .AGENTS even if IDE instrumentation tells you that the file is unchanged.
+

@@ -6,6 +6,7 @@
 
 Applicant’s Assistant is a React web app for tracking job applications and interviews.  
 The initial release is single-user with client-side IndexedDB storage.  
+The system is **multi-tenant but single-user per tenant**.  
 A later release adds background sync to a multi-user backend (C# with Entity Framework, plus an alternative Node.js backend).  
 The app displays active applications on the home page and supports details pages, import/export, and sync.
 
@@ -13,14 +14,14 @@ The app displays active applications on the home page and supports details pages
 
 ## Core scope and principles
 
-- **Client-only first:** IndexedDB for storage; hard deletes locally; provisional negative IDs.
-- **Future multi-user backend:** Server-assigned long integer IDs, soft deletes on server, auth required.
-- **Statuses from a code table:** Must be valid; extensible for future states.
-- **Time handling:** All date/time/datetime stored as UTC ISO strings; client converts for display.
-- **Attachments:** Job ad PDF stored as base64-encoded blob in IndexedDB.
-- **Credentials:** Optional, plaintext initially, included in export by default.
-- **Home page:** Shows non-rejected applications, sorted by applicationDate descending.
-- **Interviews:** Read-only in Application view; edits via Interview details page.
+- IndexedDB for storage; hard deletes locally; provisional negative IDs.
+- Server-assigned long integer IDs, soft deletes on server, auth required.
+- Statuses from a code table; extensible for future states.
+- All date/time/datetime stored as UTC ISO strings; client converts for display.
+- Job ad PDF stored as base64-encoded blob in IndexedDB.
+- Credentials optional, plaintext initially, included in export by default.
+- Home page shows non-rejected applications, sorted by applicationDate descending.
+- Interviews read-only in Application view; edits via Interview details page.
 
 ---
 
@@ -29,100 +30,35 @@ The app displays active applications on the home page and supports details pages
 ### Status tables
 
 - **Client Status table**
-  - `seqno`: number — last fully synchronized global sequence received from server.
-  - `lastUpdate`: string (UTC ISO) — timestamp of last successful sync.
-  - `dirty`: boolean — true if local changes exist to push.
-  - `lastSyncAttempt`: string (UTC ISO, optional) — timestamp of last attempted sync.
-  - `reason`: string — last error reason from failed sync; cleared on success.
+  - `seqno`, `lastUpdate`, `dirty`, `lastSyncAttempt`, `reason` (last error reason, cleared on success).
 
 - **Server Status table**
-  - `seqno`: number — single authoritative global sequence number.
-  - `lastWrite`: string (UTC ISO) — timestamp of last write committed.
+  - `seqno`, `lastWrite`.
 
 ### Code tables
 
 - **Status code table**
-  - `code`: string (e.g., “applied”, “interview”, “post-interview”, “rejected”).
-  - `label`: string — human-readable name.
-  - `isActive`: boolean — available for selection.
-  - `order`: number — UI sort order.
+  - `code`, `label`, `isActive`, `order`.
 
 ### Application entity
 
-- **Required fields**
-  - `id`: number (long int; negative provisional on client, positive server-assigned).
-  - `companyName`: string.
-  - `companyUrl`: string.
-  - `careersSiteUrl`: string.
-  - `jobAdPdfBase64`: string (base64).
-  - `roleTitle`: string.
-  - `applicationDate`: string (UTC ISO date).
-  - `status`: string (must be present in status code table).
-
-- **Optional fields**
-  - `contactEmail`: string.
-  - `baseCompensation`: string.
-  - `careerSiteUsername`: string.
-  - `careerSitePassword`: string.
-  - `coverLetterText`: string.
-  - `gitRepoUrl`: string.
-  - `rejectionDate`: string (UTC ISO date).
-  - `reapplyEligibleDate`: string (UTC ISO date).
-  - `notes`: string.
-
-- **Delete behavior**
-  - Client: hard delete; cascade to interviews.
-  - Server: soft delete; cascade to interviews.
+- Required: `id`, `companyName`, `companyUrl`, `careersSiteUrl`, `jobAdPdfBase64`, `roleTitle`, `applicationDate`, `status`.
+- Optional: `contactEmail`, `baseCompensation`, `careerSiteUsername`, `careerSitePassword`, `coverLetterText`, `gitRepoUrl`, `rejectionDate`, `reapplyEligibleDate`, `notes`.
+- Delete: client hard delete; server soft delete.
 
 ### Interview entity
 
-- **Fields**
-  - `id`: number (long int; negative provisional on client, positive server-assigned).
-  - `applicationId`: number (FK to Application.id).
-  - `meetingUrl`: string (optional).
-  - `meetingAddress`: string (optional).
-  - `interviewerName`: string (required).
-  - `interviewerPosition`: string (optional).
-  - `interviewDate`: string (UTC ISO date, required).
-  - `interviewTime`: string (UTC ISO time, required).
-  - `interviewerEmail`: string (optional).
-  - `interviewerPhone`: string (optional).
-  - `interviewNotes`: string (optional).
+- Fields: `id`, `applicationId`, `meetingUrl`, `meetingAddress`, `interviewerName`, `interviewerPosition`, `interviewDate`, `interviewTime`, `interviewerEmail`, `interviewerPhone`, `interviewNotes`.
 
 ---
 
 ## IndexedDB schema
 
-### Database name
-- `applicantsAssistant`
-
-### Object stores and indices
-
-- **status**
-  - key: `"status"` (singleton)
-  - fields: seqno, lastUpdate, dirty, lastSyncAttempt, reason
-
-- **statusCodes**
-  - key: `code` (string)
-  - fields: code, label, isActive, order
-  - indices: `byOrder`
-
-- **applications**
-  - key: `id` (long int; negative provisional allowed)
-  - indices: `byCompanyName`, `byCompanyUrl`, `byStatus`, `byApplicationDate`
-
-- **interviews**
-  - key: `id` (long int; negative provisional allowed)
-  - indices: `byApplicationId`, `byInterviewDate`
-
-- **syncQueue**
-  - key: auto-increment
-  - fields:
-    - `operationType`: string (CREATE, UPDATE, DELETE)
-    - `entityType`: string (application/interview)
-    - `entityId`: number (negative provisional or positive server-assigned)
-    - `timestamp`: string (UTC ISO)
-    - `lastAttempt`: string (UTC ISO)
+- **status**: singleton.
+- **statusCodes**: keyed by `code`.
+- **applications**: keyed by `id`.
+- **interviews**: keyed by `id`.
+- **syncQueue**: auto-increment key; fields: `operationType`, `entityType`, `entityId`, `timestamp`, `lastAttempt`.
 
 ---
 
@@ -133,76 +69,85 @@ The app displays active applications on the home page and supports details pages
 - **Content area:** Scrollable, resizable.
 - **Footer:**  
   - Center: “© [current year] Applicant’s Assistant”  
-  - Right: status indicator  
-    - Green `+` when online (last network op succeeded)  
-    - Red `-` when offline (last op and retries failed)  
-    - Blue `>>>` when sync in progress  
+  - Right: status indicator (green `+`, red `-`, blue `>>>`).
 
 ### Pages
 
-- **Home page**
-  - Menu bar: “New Application”, “Sync”, “Import”, “Export”
-  - Abbreviated list: companyName, roleTitle, applicationDate, status
-  - Left-column button opens Application details
-
-- **Application details page**
-  - Menu bar: “Save”, “Cancel”, “Add Interview”, “Delete” (if not provisional)
-  - Shows all application fields + interview table (date, time, interviewer name)
-  - Save: returns to Home immediately; sync runs in background
-  - Cancel: confirmation dialog; abandon edits, no drafts retained
-  - Add Interview: navigates to Interview details
-  - Delete: queues delete, hard deletes locally, syncs with server
-
-- **Interview details page**
-  - Menu bar: “Done”, “Cancel”, “Delete” (if not provisional)
-  - Buttons interact only with IndexedDB; sync occurs when parent Application is saved
+- **Home page:** Buttons: New Application, Sync, Import, Export. Shows abbreviated list. Left-column button opens Application details.
+- **Application details page:** Buttons: Save, Cancel, Add Interview, Delete (if not provisional). Shows full fields + interview table.
+- **Interview details page:** Buttons: Done, Cancel, Delete (if not provisional). Buttons interact only with IndexedDB; sync occurs when parent Application is saved.
 
 ---
 
 ## Validation
 
-- **Timing:** on blur
-- **Rules:**
-  - Status must exist in statusCodes
-  - Email format: local-part before “@”; domain contains at least one period; no consecutive periods
-  - IDs must be numeric
-  - Dates/times must be UTC ISO
+**Summary:** Validation occurs on blur, ensuring data integrity before saving.
+
+**Steps:**
+1. Status must exist in statusCodes.
+2. Email must match regex `^[^@\s]+@[^@\s]+\.[^@\s]+$`.
+3. IDs must be numeric.
+4. Dates/times must be UTC ISO with milliseconds.
+5. Interview FK must reference valid Application.
 
 ---
 
 ## Import and export
 
-- **Export:** JSON with status, statusCodes, applications, interviews; PDFs base64; credentials included.
-- **Import:**  
-  - If validation passes: backup local DB, apply import.  
-  - If import fails: restore backup, discard backup after restore.  
-  - Minimal validations: required fields, valid status codes, numeric IDs, valid references, base64 PDFs.
+**Summary:** Import/export handles JSON data with backup/restore safety.
+
+**Steps:**
+1. **Export:** JSON with status, statusCodes, applications, interviews; PDFs base64; credentials included; no provisional IDs.
+2. **Import:**  
+   - Validate required fields, referential integrity, formats.  
+   - If valid: backup DB, apply import.  
+   - If invalid: restore backup, discard backup.  
+   - Provisional IDs disallowed.
 
 ---
 
 ## Sync design
 
-- **Client Status:** seqno, lastUpdate, dirty, lastSyncAttempt, reason
-- **Server Status:** seqno, lastWrite
-- **Provisional IDs:** replaced with server-assigned IDs on success
-- **Deletes:** client hard deletes; server soft deletes; tombstones sent in deltas
-- **Phases:**
-  - Phase 1: check if sync needed
-  - Phase 2: push/pull changes
-  - Phase 3: finalize, update Status, clear queue entries
-- **Anomaly:** client seqno > server seqno -> full client refresh
-- **Ordering/idempotency:** server guarantees ordered, idempotent deltas
+**Summary:** Sync is a four-phase process: assess, pull, push, finalize.
+
+**Steps:**
+1. **Assess:** Compare client/server `seqno`. Attempt once; if fails, bail with error.
+2. **Pull:** Fetch added/updated/tombstones since `lastUpdate`. Retry on error.
+3. **Push:** Send consolidated queue; server returns authoritative records + ID map. Retry on error.
+4. **Finalize:** Apply changes atomically; update Status; clear queue entries; set green indicator.
+
+**Additional rules:**
+- Provisional IDs replaced with server IDs (parent first, then children).
+- Deletes: client hard deletes; server soft deletes; skip if already deleted.
+- Offline halts scheduler.
+- Indicator: blue during sync attempts, green only after finalize, red after retries exhausted.
 
 ---
 
 ## Retry policy
 
-- Attempt 1: T+0  
-- Attempt 2: T+15s  
-- Attempt 3: T+30s  
-- Attempt 4: T+2m  
-- Attempt 5: T+5m  
-- After 5 failures: offline until manual sync
+**Summary:** Exponential backoff governs retries.
+
+**Steps:**
+1. Attempt 1: T+0  
+2. Attempt 2: T+15s  
+3. Attempt 3: T+30s  
+4. Attempt 4: T+2m  
+5. Attempt 5: T+5m  
+6. After 5 failures: offline until manual sync.
+
+---
+
+## Error handling
+
+**Summary:** All server errors retried; error categorization deferred.
+
+**Steps:**
+1. Retry on any server error using backoff schedule.
+2. If retries exhausted, set offline state.
+3. Record last error in `Status.reason`.
+4. Clear `Status.reason` on success.
+5. Backlog: define fatal vs retryable split.
 
 ---
 
@@ -210,13 +155,7 @@ The app displays active applications on the home page and supports details pages
 
 - Credentials stored plaintext in IndexedDB; included in exports.
 - Authentication required in multi-user backend; client purges DB on user change.
-
----
-
-## Error handling
-
-- Status.reason stores last error; cleared on success.
-- SyncQueue entries retried until success; remain until manual sync if retries exhausted.
+- Encryption backlog.
 
 ---
 
@@ -224,18 +163,27 @@ The app displays active applications on the home page and supports details pages
 
 - Schema versioning
 - Encryption at rest
-- Conflict resolution UI
+- Conflict resolution UI (field-level merge)
 - Calendar/reminders
 - Client event log
-- Show sync details (likely a “?” icon next to footer indicator)
-- Import/export of SyncQueue (considered for offline portability)
+- Show sync details (“?” icon next to footer indicator)
+- Import/export of SyncQueue
+- IndexedDB write failure handling
+- Attachment size limits and chunking
+- Schema migration/versioning
+- Tests and observability
+- Discerning between server errors (fatal vs retryable split)
 
 ---
 
 ## Outstanding Tasks
 
-- **Conflict resolution:** Not yet defined. Must decide how to handle concurrent edits in multi-user scenarios.  
-- **Partial sync success:** Not yet defined. Must decide whether to retry failed half immediately or defer to next sync cycle.
+- **Conflict resolution:** Not yet defined; backlog for field-level merge.  
+- **Partial sync success:** Clarified; pull then push; bail if pull fails; offline if push retries exhausted.  
+- **IndexedDB write failure handling:** backlog.  
+- **Attachment size/chunking:** backlog.  
+- **Schema migration/versioning:** backlog.  
+- **Error categorization:** backlog.
 
 ---
 
@@ -247,14 +195,14 @@ The app displays active applications on the home page and supports details pages
     "id": -1001,
     "companyName": "Acme Corp",
     "roleTitle": "Senior Developer",
-    "applicationDate": "2025-12-10T00:00:00Z",
+    "applicationDate": "2025-12-10T00:00:00.000Z",
     "status": "applied"
   },
   "interview": {
     "id": -2001,
     "applicationId": -1001,
     "interviewerName": "Jane Smith",
-    "interviewDate": "2025-12-15T00:00:00Z",
-    "interviewTime": "2025-12-15T15:00:00Z"
+    "interviewDate": "2025-12-15T00:00:00.000Z",
+    "interviewTime": "2025-12-15T15:00:00.000Z"
   }
 }
