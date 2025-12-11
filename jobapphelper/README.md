@@ -124,6 +124,26 @@ The app displays active applications on the home page and supports details pages
 
 ---
 
+## Sync clarifications
+
+1. **Server API surface:** Endpoints `/sync/assess`, `/sync/pull`, `/sync/push`, `/auth/login`, `/auth/refresh`. Bearer JWT auth. JSON payloads.  
+2. **Seqno definition:** Per-tenant global seqno. Server increments on any write; client updates after finalize.  
+3. **Authoritative record & ID map:** Records include all fields + `lastWrite` + `isDeleted`. ID map: `{ provisionalId, serverId, entityType }`.  
+4. **Provisional IDs:** Negative integers only. Client ensures uniqueness; server rejects negatives.  
+5. **Provisional ID handling:** Preserve until server returns mapping. Remap atomically in finalize.  
+6. **Parent->child ordering:** Not required; server resolves relationships using ID map.  
+7. **Deletes:** Client->server: operationType=delete. Server->client: tombstone with `isDeleted=true`.  
+9. **Timestamps:** Per-record `lastWrite` only; no per-field timestamps.  
+10. **Partial push:** All-or-nothing batch; retry entire push if any fail.  
+11. **Atomicity guarantees:** Transactional batch; either full success or no side-effects.  
+12. **Soft-deletes referencing hard-deletes:** Client ignores but records event; idempotent.  
+15. **Authentication refresh:** On 401, refresh token once; retry phase. If refresh fails, offline state.  
+16. **Concurrent sync sessions:** Supported; server serializes via seqno/lastWrite. Clients converge via pull-then-push.  
+17. **Sync frequency & batching:** Manual + background every 5 minutes. Batch up to 100 ops or 1 MB payload.  
+18. **Pagination in pull:** Token-based pagination with `nextPageToken`.
+
+---
+
 ## Retry policy
 
 **Summary:** Exponential backoff governs retries.
@@ -206,3 +226,4 @@ The app displays active applications on the home page and supports details pages
     "interviewTime": "2025-12-15T15:00:00.000Z"
   }
 }
+```
