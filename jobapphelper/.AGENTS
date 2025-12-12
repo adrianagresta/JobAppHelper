@@ -1,0 +1,24 @@
+This file contains instructions for AI agents. 
+
+Reread this file with every prompt even if you have read it before.
+
+Always follow best practices.
+
+Always follow good object oriented design principles.
+
+When writing code, if there is a choice between readability and shorter code, choose readability.
+
+When adding new functions, always add a block comment before it that follows JS doc style and describes what the function does. Include an example.
+When modifying existing functions, always update or add a block comment before it that follows JS doc style and describes what the function does. Include an example.
+
+When writing or updating input parameter documentation, always include a description for the parameter. The description should explain what the parameter is used for.
+When writing or updating return value documentation, always include a description for the return value. The description should explain what the return value represents.
+
+When adding new classes, always add a block comment before it that follows JS doc style, describes what the class contains, and gives an example of how to use the class.
+When modifying existing classes, always update or add a block comment before it that follows JS doc style, describes what the class contains, and gives an example of how to use the class.
+
+When writing code, always use meaningful variable and function names.
+
+After you have read this file but before you start working on the user's request, always respond with ".AGENTS file has been read". Always 
+reread .AGENTS even if IDE instrumentation tells you that the file is unchanged.
+
