@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { setMenuItems } from '../structure/menuService';
 import { setContent } from '../structure/contentService';
-import { ApplicationsStore, StatusCodesStore } from '../../indexeddb/api';
+import { ApplicationsStore, StatusCodesStore, StatusStore } from '../../indexeddb/api';
 
 /**
  * Home content component.
@@ -91,6 +91,7 @@ function HomeContent() {
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
           <thead>
             <tr>
+              <th style={{ textAlign: 'left', padding: '6px' }} />
               <th style={{ textAlign: 'left', padding: '6px' }}>Company</th>
               <th style={{ textAlign: 'left', padding: '6px' }}>Role</th>
               <th style={{ textAlign: 'left', padding: '6px' }}>Application Date</th>
@@ -99,12 +100,17 @@ function HomeContent() {
           </thead>
           <tbody>
             {applications.map(app => (
-              <tr key={app.id} onClick={() => openApplication(app)} style={{ cursor: 'pointer', borderTop: '1px solid #eee' }}>
-                <td style={{ padding: '8px' }}>{app.companyName}</td>
-                <td style={{ padding: '8px' }}>{app.roleTitle}</td>
-                <td style={{ padding: '8px' }}>{app.applicationDate ? new Date(app.applicationDate).toLocaleString() : ''}</td>
-                <td style={{ padding: '8px' }}>{app.status}</td>
-              </tr>
+            <tr key={app.id} style={{ borderTop: '1px solid #eee' }}>
+              <td style={{ padding: '8px', width: 80 }}>
+                <a href="#" onClick={(e) => { e.preventDefault(); openApplicationById(app.id); }}>
+                  Open
+                </a>
+              </td>
+              <td style={{ padding: '8px' }}>{app.companyName}</td>
+              <td style={{ padding: '8px' }}>{app.roleTitle}</td>
+              <td style={{ padding: '8px' }}>{app.applicationDate ? new Date(app.applicationDate).toLocaleString() : ''}</td>
+              <td style={{ padding: '8px' }}>{app.status}</td>
+            </tr>
             ))}
           </tbody>
         </table>
@@ -127,10 +133,19 @@ function HomeContent() {
  * handleNewApplication()
  */
 async function handleNewApplication() {
-  const mod = await import('./ApplicationContent');
-  // create a new provisional application (id negative indicates provisional)
-  const el = <mod.default application={{ id: -1 }} />;
-  setContent(el);
+  try {
+    const provisionalId = await StatusStore.allocateNextProvisionalId();
+    const mod = await import('./ApplicationContent');
+    const el = <mod.default application={{ id: provisionalId }} />;
+    setContent(el);
+  } catch (err) {
+    // fallback to -1
+    // eslint-disable-next-line no-console
+    console.error('Failed to allocate provisional id, falling back to -1', err);
+    const mod = await import('./ApplicationContent');
+    const el = <mod.default application={{ id: -1 }} />;
+    setContent(el);
+  }
 }
 
 
@@ -150,6 +165,22 @@ async function openApplication(application) {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Failed to load ApplicationContent', err);
+  }
+}
+
+/**
+ * Open application by id: fetch full application from DB and open it.
+ * @param {number} id - application id
+ */
+async function openApplicationById(id) {
+  try {
+    const app = await ApplicationsStore.get(id);
+    if (!app) return;
+    const { default: ApplicationContent } = await import('./ApplicationContent');
+    setContent(<ApplicationContent application={app} />);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to open application', err);
   }
 }
 

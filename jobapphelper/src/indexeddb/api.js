@@ -105,6 +105,30 @@ export async function iterate(storeName, callback) {
 export const StatusStore = {
   get: () => get(STORES.STATUS, 'singleton'),
   put: (v) => put(STORES.STATUS, v),
+  /**
+   * Allocate the next provisional id by atomically decrementing the
+   * `nextProvisionalId` field in the singleton status record and returning
+   * the new value.
+   * @returns {Promise<number>} next provisional negative id
+   */
+  async allocateNextProvisionalId() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction([STORES.STATUS], 'readwrite');
+      const os = tx.objectStore(STORES.STATUS);
+      const req = os.get('singleton');
+      req.onsuccess = (e) => {
+        const rec = e.target.result || { id: 'singleton', nextProvisionalId: -1 };
+        if (typeof rec.nextProvisionalId !== 'number') rec.nextProvisionalId = -1;
+        const next = rec.nextProvisionalId;
+        rec.nextProvisionalId = next - 1;
+        const putReq = os.put(rec);
+        putReq.onsuccess = () => resolve(next);
+        putReq.onerror = () => reject(putReq.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
 };
 
 export const StatusCodesStore = {

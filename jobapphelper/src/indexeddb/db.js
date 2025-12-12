@@ -14,7 +14,12 @@ export function openDB() {
       // Create stores if they don't exist
       if (!db.objectStoreNames.contains(STORES.STATUS)) {
         const s = db.createObjectStore(STORES.STATUS, { keyPath: 'id' });
-        // singleton: use fixed id
+        // singleton: use fixed id. Create initial singleton record with nextProvisionalId = -1
+        try {
+          s.add({ id: 'singleton', nextProvisionalId: -1 });
+        } catch (e) {
+          // ignore if add not allowed in this environment
+        }
       }
       if (!db.objectStoreNames.contains(STORES.STATUS_CODES)) {
         const sc = db.createObjectStore(STORES.STATUS_CODES, { keyPath: 'code' });
