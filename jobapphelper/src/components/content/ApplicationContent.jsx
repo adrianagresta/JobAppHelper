@@ -15,13 +15,17 @@ import { setContent } from '../structure/contentService';
  */
 function ApplicationContent({ application }) {
   useEffect(() => {
-    // Register detail-page buttons: Save, Cancel, Add Interview, Delete
-    setMenuItems([
+    // Register detail-page buttons: Save, Cancel, Add Interview, and Delete only
+    // when the application is not provisional (id >= 0).
+    const items = [
       ['Save', handleSave],
       ['Cancel', handleCancel],
       ['Add Interview', handleAddInterview],
-      ['Delete', handleDelete],
-    ]);
+    ];
+    if (application && typeof application.id === 'number' && application.id >= 0) {
+      items.push(['Delete', handleDelete]);
+    }
+    setMenuItems(items);
 
     return () => {
       // Clear menu when leaving application detail view
