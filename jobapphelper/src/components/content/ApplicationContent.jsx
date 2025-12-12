@@ -3,6 +3,7 @@ import { setMenuItems } from '../structure/menuService';
 import { setContent } from '../structure/contentService';
 import { ApplicationsStore } from '../../indexeddb/api';
 import { enqueue as enqueueSync } from '../../indexeddb/syncQueue';
+import { InterviewsStore } from '../../indexeddb/api';
 
 /**
  * ApplicationContent component.
@@ -16,25 +17,6 @@ import { enqueue as enqueueSync } from '../../indexeddb/syncQueue';
  * <ApplicationContent application={{ id: -1 }} />
  */
 function ApplicationContent({ application }) {
-  useEffect(() => {
-    // Register detail-page buttons: Save, Cancel, Add Interview, and Delete only
-    // when the application is not provisional (id >= 0).
-    const items = [
-      ['Save', handleSave],
-      ['Cancel', handleCancel],
-      ['Add Interview', handleAddInterview],
-    ];
-    if (application && typeof application.id === 'number' && application.id >= 0) {
-      items.push(['Delete', handleDelete]);
-    }
-    setMenuItems(items);
-
-    return () => {
-      // Clear menu when leaving application detail view
-      setMenuItems([]);
-    };
-  }, []);
-
   // Local form state for all Application fields
   const [companyName, setCompanyName] = useState((application && application.companyName) || '');
   const [companyUrl, setCompanyUrl] = useState((application && application.companyUrl) || '');
@@ -52,6 +34,112 @@ function ApplicationContent({ application }) {
   const [rejectionDate, setRejectionDate] = useState((application && application.rejectionDate) || '');
   const [reapplyEligibleDate, setReapplyEligibleDate] = useState((application && application.reapplyEligibleDate) || '');
   const [notes, setNotes] = useState((application && application.notes) || '');
+  const [interviews, setInterviews] = useState([]);
+
+  // Handlers need access to component state and props, so define them here.
+  async function handleSave() {
+    try {
+      const app = Object.assign({}, application || {});
+      if (typeof app.id !== 'number') {
+        app.id = -Date.now();
+      }
+      app.companyName = companyName;
+      app.companyUrl = companyUrl;
+      app.careersSiteUrl = careersSiteUrl;
+      app.jobAdPdfBase64 = jobAdPdfBase64;
+      app.roleTitle = roleTitle;
+      app.applicationDate = applicationDate ? new Date(applicationDate).toISOString() : new Date().toISOString();
+      app.status = status;
+      app.contactEmail = contactEmail;
+      app.baseCompensation = baseCompensation;
+      app.careerSiteUsername = careerSiteUsername;
+      app.careerSitePassword = careerSitePassword;
+      app.coverLetterText = coverLetterText;
+      app.gitRepoUrl = gitRepoUrl;
+      app.rejectionDate = rejectionDate || null;
+      app.reapplyEligibleDate = reapplyEligibleDate || null;
+      app.notes = notes;
+
+      await ApplicationsStore.put(app);
+      await enqueueSync({ operationType: 'upsert', entityType: 'application', entityId: app.id, timestamp: Date.now() });
+
+      const { default: HomeContent } = await import('./HomeContent');
+      setContent(<HomeContent />);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to save application', err);
+    }
+  }
+
+  function handleCancel() {
+    import('./HomeContent').then((m) => {
+      const Comp = m.default;
+      if (Comp) setContent(<Comp />);
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load HomeContent', err);
+    });
+  }
+
+  function handleAddInterview() {
+    import('./InterviewContent').then((m) => {
+      const Comp = m.default;
+      if (Comp) {
+        setContent(<Comp applicationId={application && application.id} />);
+      } else {
+        // eslint-disable-next-line no-console
+        console.error('InterviewContent module did not export a default component');
+      }
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load InterviewContent', err);
+    });
+  }
+
+  function handleDelete() {
+    // TODO: implement delete (hard delete + enqueue delete op)
+    // eslint-disable-next-line no-console
+    console.log('Delete clicked');
+  }
+
+  useEffect(() => {
+    const items = [
+      ['Save', handleSave],
+      ['Cancel', handleCancel],
+      ['Add Interview', handleAddInterview],
+    ];
+    if (application && typeof application.id === 'number' && application.id >= 0) {
+      items.push(['Delete', handleDelete]);
+    }
+    setMenuItems(items);
+
+    return () => {
+      setMenuItems([]);
+    };
+  }, [handleSave, handleCancel, handleAddInterview, handleDelete, application]);
+
+  // (state declarations moved above when handlers were created)
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadInterviews() {
+      try {
+        const items = await InterviewsStore.getByApplication(application && application.id);
+        if (!mounted) return;
+        items.sort((a, b) => {
+          const ta = a && a.interviewDate ? new Date(a.interviewDate).getTime() : 0;
+          const tb = b && b.interviewDate ? new Date(b.interviewDate).getTime() : 0;
+          return ta - tb; // ascending
+        });
+        setInterviews(items || []);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load interviews', err);
+      }
+    }
+    loadInterviews();
+    return () => { mounted = false; };
+  }, [application]);
 
   return (
     <div>
@@ -140,6 +228,33 @@ function ApplicationContent({ application }) {
         <div style={{ marginTop: 12 }}>
           <small>Use the menu buttons to Save / Cancel / Add Interview / Delete</small>
         </div>
+      <div style={{ marginTop: 20 }}>
+        <h3>Interviews</h3>
+        {interviews.length === 0 ? (
+          <div style={{ fontStyle: 'italic' }}>No interviews</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: '6px' }}>Interviewer</th>
+                <th style={{ textAlign: 'left', padding: '6px' }}>Date</th>
+                <th style={{ textAlign: 'left', padding: '6px' }}>Time</th>
+                <th style={{ textAlign: 'left', padding: '6px' }}>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {interviews.map(iv => (
+                <tr key={iv.id} style={{ borderTop: '1px solid #eee' }}>
+                  <td style={{ padding: 8 }}>{iv.interviewerName}</td>
+                  <td style={{ padding: 8 }}>{iv.interviewDate ? new Date(iv.interviewDate).toLocaleDateString() : ''}</td>
+                  <td style={{ padding: 8 }}>{iv.interviewTime}</td>
+                  <td style={{ padding: 8 }}>{iv.interviewNotes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
       </div>
     </div>
   );
@@ -149,94 +264,6 @@ function ApplicationContent({ application }) {
  * Stub handler for saving the application.
  * @example handleSave()
  */
-function handleSave() {
-  (async () => {
-    try {
-      // prepare application object from form state
-      const app = Object.assign({}, application || {});
-      // ensure id exists; generate provisional negative id if needed
-      if (!app.id || typeof app.id !== 'number' || app.id >= 0 === false) {
-        // provisional negative id: timestamp-based
-        app.id = -Date.now();
-      }
-      app.companyName = companyName;
-      app.companyUrl = companyUrl;
-      app.careersSiteUrl = careersSiteUrl;
-      app.jobAdPdfBase64 = jobAdPdfBase64;
-      app.roleTitle = roleTitle;
-      // normalize applicationDate to ISO if possible
-      app.applicationDate = applicationDate ? new Date(applicationDate).toISOString() : new Date().toISOString();
-      app.status = status;
-      app.contactEmail = contactEmail;
-      app.baseCompensation = baseCompensation;
-      app.careerSiteUsername = careerSiteUsername;
-      app.careerSitePassword = careerSitePassword;
-      app.coverLetterText = coverLetterText;
-      app.gitRepoUrl = gitRepoUrl;
-      app.rejectionDate = rejectionDate || null;
-      app.reapplyEligibleDate = reapplyEligibleDate || null;
-      app.notes = notes;
-
-      await ApplicationsStore.put(app);
-
-      // enqueue sync operation
-      await enqueueSync({ operationType: 'upsert', entityType: 'application', entityId: app.id, timestamp: Date.now() });
-
-      // after save, return to home
-      const { default: HomeContent } = await import('./HomeContent');
-      setContent(<HomeContent />);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to save application', err);
-    }
-  })();
-}
-
-/**
- * Stub handler for canceling edit.
- * @example handleCancel()
- */
-function handleCancel() {
-  // Dynamically load HomeContent and set it as the active content.
-  // This avoids static imports and potential circular dependencies.
-  import('./HomeContent').then((m) => {
-    const Comp = m.default;
-    if (Comp) {
-      setContent(<Comp />);
-    } else {
-      console.error('HomeContent module did not export a default component');
-    }
-  }).catch((err) => {
-    console.error('Failed to load HomeContent', err);
-  });
-}
-
-/**
- * Stub handler for adding an interview.
- * @example handleAddInterview()
- */
-function handleAddInterview() {
-  // Dynamically load InterviewContent and set it as current content.
-  // Do not return a Promise (MenuBar treats a returned Promise as a renderable
-  // value). Call setContent when the module is loaded instead.
-  import('./InterviewContent').then((m) => {
-    const Comp = m.default;
-    if (Comp) {
-      setContent(<Comp />);
-    } else {
-      console.error('InterviewContent module did not export a default component');
-    }
-  }).catch((err) => {
-    console.error('Failed to load InterviewContent', err);
-  });
-}
-
-/**
- * Stub handler for deleting the application.
- * @example handleDelete()
- */
-function handleDelete() {
-  console.log('Delete clicked');
-}
+// handlers implemented inside component; bottom legacy handlers removed
 
 export default ApplicationContent;

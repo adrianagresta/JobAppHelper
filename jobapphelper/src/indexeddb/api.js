@@ -16,6 +16,31 @@ export async function get(storeName, key) {
 }
 
 /**
+ * Get records from a store by index value.
+ * @param {string} storeName - name of the object store
+ * @param {string} indexName - name of the index on the store
+ * @param {any} value - value to match
+ * @returns {Promise<any[]>} array of matching records
+ */
+export async function getByIndex(storeName, indexName, value) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([storeName], 'readonly');
+    const os = tx.objectStore(storeName);
+    const idx = os.index(indexName);
+    const results = [];
+    const req = idx.openCursor(IDBKeyRange.only(value));
+    req.onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (!cursor) return resolve(results);
+      results.push(cursor.value);
+      cursor.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
  * Put a record into a store.
  */
 export async function put(storeName, value) {
@@ -100,6 +125,7 @@ export const InterviewsStore = {
   put: (it) => put(STORES.INTERVIEWS, it),
   delete: (id) => del(STORES.INTERVIEWS, id),
   getAll: () => getAll(STORES.INTERVIEWS),
+  getByApplication: (applicationId) => getByIndex(STORES.INTERVIEWS, 'applicationId', applicationId),
 };
 
 export const SyncQueueStore = {
