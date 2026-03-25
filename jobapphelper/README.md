@@ -33,12 +33,13 @@ The app displays active applications on the home page and supports details pages
   - `seqno`, `lastUpdate`, `dirty`, `lastSyncAttempt`, `reason` (last error reason, cleared on success).
 
 - **Server Status table**
-  - `seqno`, `lastWrite`.
+  - `seqno`, `userId`, `lastWrite`.
 
 ### Code tables
 
 - **Status code table**
   - `code`, `label`, `isActive`, `order`.
+  - Valid codes: `applied`, `interviewing`, `offered`, `rejected`, `accepted`, `withdrawn`.
 
 ### Application entity
 
