@@ -102,6 +102,17 @@ function ApplicationContent({ application }) {
     console.log('Delete clicked');
   }
 
+  function validateCompanyUrl(companyUrl, companyField) {
+    const urlRegex = /^(https?:\/\/)([^\s:@]+(:[^\s:@]*)?@)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(:\d{2,5})?(\/[^\s]*)?$/;
+    if (urlRegex.test(companyUrl)) {
+      // make field red
+      companyField.classList.remove("invalid");
+    } else {
+      // make field not red
+      companyField.classList.add("invalid");
+    }
+  }
+
   useEffect(() => {
     const items = [
       ['Save', handleSave],
@@ -141,93 +152,169 @@ function ApplicationContent({ application }) {
     return () => { mounted = false; };
   }, [application]);
 
+  const formGridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'max-content 1fr',
+    gap: '12px 16px',
+    alignItems: 'center',
+    width: '100%',
+  };
+
+  const controlStyle = {
+    width: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
+  };
+
+  const textareaStyle = {
+    ...controlStyle,
+    resize: 'vertical',
+  };
+
   return (
     <div>
       <h2>Application</h2>
       <p>Editing application id: {application && application.id}</p>
-      <div>
-        <label>
-          Company Name
-          <input value={companyName} onChange={e => setCompanyName(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Company URL
-          <input value={companyUrl} onChange={e => setCompanyUrl(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Careers Site URL
-          <input value={careersSiteUrl} onChange={e => setCareersSiteUrl(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Job Ad (base64)
-          <textarea value={jobAdPdfBase64} onChange={e => setJobAdPdfBase64(e.target.value)} rows={3} />
-        </label>
-        <br />
-        <label>
-          Role Title
-          <input value={roleTitle} onChange={e => setRoleTitle(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Application Date
-          <input value={applicationDate} onChange={e => setApplicationDate(e.target.value)} placeholder="YYYY-MM-DDTHH:MM:SS.sssZ" />
-        </label>
-        <br />
-        <label>
-          Status
-          <input value={status} onChange={e => setStatus(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Contact Email
-          <input value={contactEmail} onChange={e => setContactEmail(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Base Compensation
-          <input value={baseCompensation} onChange={e => setBaseCompensation(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Careers Site Username
-          <input value={careerSiteUsername} onChange={e => setCareerSiteUsername(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Careers Site Password
-          <input value={careerSitePassword} onChange={e => setCareerSitePassword(e.target.value)} type="password" />
-        </label>
-        <br />
-        <label>
-          Cover Letter Text
-          <textarea value={coverLetterText} onChange={e => setCoverLetterText(e.target.value)} rows={3} />
-        </label>
-        <br />
-        <label>
-          Git Repo URL
-          <input value={gitRepoUrl} onChange={e => setGitRepoUrl(e.target.value)} />
-        </label>
-        <br />
-        <label>
-          Rejection Date
-          <input value={rejectionDate} onChange={e => setRejectionDate(e.target.value)} placeholder="YYYY-MM-DDTHH:MM:SS.sssZ" />
-        </label>
-        <br />
-        <label>
-          Reapply Eligible Date
-          <input value={reapplyEligibleDate} onChange={e => setReapplyEligibleDate(e.target.value)} placeholder="YYYY-MM-DDTHH:MM:SS.sssZ" />
-        </label>
-        <br />
-        <label>
-          Notes
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
-        </label>
-        <div style={{ marginTop: 12 }}>
-          <small>Use the menu buttons to Save / Cancel / Add Interview / Delete</small>
-        </div>
+      <div style={formGridStyle}>
+        <label htmlFor="companyName">Company Name</label>
+        <input
+          id="companyName"
+          value={companyName}
+          onChange={e => setCompanyName(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="companyUrl">Company URL</label>
+        <input
+          id="companyUrl"
+          value={companyUrl}
+          onChange={e => setCompanyUrl(e.target.value)}
+          onBlur={e => validateCompanyUrl(e.target.value, e.target)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="careersSiteUrl">Careers Site URL</label>
+        <input
+          id="careersSiteUrl"
+          value={careersSiteUrl}
+          onChange={e => setCareersSiteUrl(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="jobAdPdfBase64">Job Ad (base64)</label>
+        <textarea
+          id="jobAdPdfBase64"
+          value={jobAdPdfBase64}
+          onChange={e => setJobAdPdfBase64(e.target.value)}
+          rows={3}
+          style={textareaStyle}
+        />
+
+        <label htmlFor="roleTitle">Role Title</label>
+        <input
+          id="roleTitle"
+          value={roleTitle}
+          onChange={e => setRoleTitle(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="applicationDate">Application Date</label>
+        <input
+          id="applicationDate"
+          value={applicationDate}
+          onChange={e => setApplicationDate(e.target.value)}
+          placeholder="YYYY-MM-DDTHH:MM:SS.sssZ"
+          style={controlStyle}
+        />
+
+        <label htmlFor="status">Status</label>
+        <input
+          id="status"
+          value={status}
+          onChange={e => setStatus(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="contactEmail">Contact Email</label>
+        <input
+          id="contactEmail"
+          value={contactEmail}
+          onChange={e => setContactEmail(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="baseCompensation">Base Compensation</label>
+        <input
+          id="baseCompensation"
+          value={baseCompensation}
+          onChange={e => setBaseCompensation(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="careerSiteUsername">Careers Site Username</label>
+        <input
+          id="careerSiteUsername"
+          value={careerSiteUsername}
+          onChange={e => setCareerSiteUsername(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="careerSitePassword">Careers Site Password</label>
+        <input
+          id="careerSitePassword"
+          type="password"
+          value={careerSitePassword}
+          onChange={e => setCareerSitePassword(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="coverLetterText">Cover Letter Text</label>
+        <textarea
+          id="coverLetterText"
+          value={coverLetterText}
+          onChange={e => setCoverLetterText(e.target.value)}
+          rows={3}
+          style={textareaStyle}
+        />
+
+        <label htmlFor="gitRepoUrl">Git Repo URL</label>
+        <input
+          id="gitRepoUrl"
+          value={gitRepoUrl}
+          onChange={e => setGitRepoUrl(e.target.value)}
+          style={controlStyle}
+        />
+
+        <label htmlFor="rejectionDate">Rejection Date</label>
+        <input
+          id="rejectionDate"
+          value={rejectionDate}
+          onChange={e => setRejectionDate(e.target.value)}
+          placeholder="YYYY-MM-DDTHH:MM:SS.sssZ"
+          style={controlStyle}
+        />
+
+        <label htmlFor="reapplyEligibleDate">Reapply Eligible Date</label>
+        <input
+          id="reapplyEligibleDate"
+          value={reapplyEligibleDate}
+          onChange={e => setReapplyEligibleDate(e.target.value)}
+          placeholder="YYYY-MM-DDTHH:MM:SS.sssZ"
+          style={controlStyle}
+        />
+
+        <label htmlFor="notes">Notes</label>
+        <textarea
+          id="notes"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          rows={3}
+          style={textareaStyle}
+        />
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <small>Use the menu buttons to Save / Cancel / Add Interview / Delete</small>
+      </div>
       <div style={{ marginTop: 20 }}>
         <h3>Interviews</h3>
         {interviews.length === 0 ? (
@@ -254,7 +341,6 @@ function ApplicationContent({ application }) {
             </tbody>
           </table>
         )}
-      </div>
       </div>
     </div>
   );
