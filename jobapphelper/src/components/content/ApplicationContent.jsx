@@ -17,13 +17,15 @@ import { InterviewsStore } from '../../indexeddb/api';
  * <ApplicationContent application={{ id: -1 }} />
  */
 function ApplicationContent({ application }) {
+  let today = new Date().toISOString().split("T")[0];
+  console.log(today);
   // Local form state for all Application fields
   const [companyName, setCompanyName] = useState((application && application.companyName) || '');
   const [companyUrl, setCompanyUrl] = useState((application && application.companyUrl) || '');
   const [careersSiteUrl, setCareersSiteUrl] = useState((application && application.careersSiteUrl) || '');
   const [jobAdPdfBase64, setJobAdPdfBase64] = useState((application && application.jobAdPdfBase64) || '');
   const [roleTitle, setRoleTitle] = useState((application && application.roleTitle) || '');
-  const [applicationDate, setApplicationDate] = useState((application && application.applicationDate) || '');
+  const [applicationDate, setApplicationDate] = useState((application && application.applicationDate) || today);
   const [status, setStatus] = useState((application && application.status) || '');
   const [contactEmail, setContactEmail] = useState((application && application.contactEmail) || '');
   const [baseCompensation, setBaseCompensation] = useState((application && application.baseCompensation) || '');
@@ -182,6 +184,7 @@ function ApplicationContent({ application }) {
           value={companyName}
           onChange={e => setCompanyName(e.target.value)}
           style={controlStyle}
+          required
         />
 
         <label htmlFor="companyUrl">Company URL</label>
@@ -216,6 +219,7 @@ function ApplicationContent({ application }) {
           value={roleTitle}
           onChange={e => setRoleTitle(e.target.value)}
           style={controlStyle}
+          required
         />
 
         <label htmlFor="applicationDate">Application Date</label>
@@ -225,15 +229,19 @@ function ApplicationContent({ application }) {
           onChange={e => setApplicationDate(e.target.value)}
           placeholder="YYYY-MM-DDTHH:MM:SS.sssZ"
           style={controlStyle}
+          type="date"
         />
 
         <label htmlFor="status">Status</label>
-        <input
-          id="status"
-          value={status}
-          onChange={e => setStatus(e.target.value)}
-          style={controlStyle}
-        />
+        <select id="status" onChange={e => setStatus(e.target.value)}
+          value={status} style={controlStyle}>
+          <option value="00" default>Pending</option>
+          <option value="01">Applied</option>
+          <option value="02">Interviewing</option>
+          <option value="03">Offer</option>
+          <option value="04">Rejected</option>
+          <option value="05">Abandoned</option>
+        </select>
 
         <label htmlFor="contactEmail">Contact Email</label>
         <input
